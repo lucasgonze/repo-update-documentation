@@ -3,18 +3,42 @@
   "last_updated": "2026-04-03",
   "repos_dir": "repos",
   "output_dir": "diffs",
-  "comment": "Using this repository as test data with multiple commit ranges",
+  "comment": "Test data: each entry tests different diff filtering features",
   "repositories": [
     {
       "name": "repo-update-documentation",
       "url": "git@github.com:lucasgonze/repo-update-documentation.git",
-      "starting_commit": "a8d291a",
-      "ending_commit": "HEAD"
+      "starting_commit": "88196e5",
+      "ending_commit": "81cdc67",
+      "description": "Test 1: Pure additions - new file with only added lines"
     },
     {
       "name": "repo-update-documentation",
       "url": "git@github.com:lucasgonze/repo-update-documentation.git",
-      "starting_commit": "a8d291a"
+      "starting_commit": "04ba1e4",
+      "ending_commit": "7018918",
+      "description": "Test 2: Mixed additions and deletions - verify deletions are filtered"
+    },
+    {
+      "name": "repo-update-documentation",
+      "url": "git@github.com:lucasgonze/repo-update-documentation.git",
+      "starting_commit": "7018918",
+      "ending_commit": "6cb0ffe",
+      "description": "Test 3: Multiple files changed in one commit"
+    },
+    {
+      "name": "repo-update-documentation",
+      "url": "git@github.com:lucasgonze/repo-update-documentation.git",
+      "starting_commit": "6cb0ffe",
+      "ending_commit": "79ef87d",
+      "description": "Test 4: Edge case - file with --- in content (markdown rules, YAML frontmatter)"
+    },
+    {
+      "name": "repo-update-documentation",
+      "url": "git@github.com:lucasgonze/repo-update-documentation.git",
+      "starting_commit": "9195177",
+      "ending_commit": "3fb1ba6",
+      "description": "Test 5: Only deletions - should result in empty filtered diff with warning"
     }
   ]
 }
