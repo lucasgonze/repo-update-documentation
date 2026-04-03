@@ -1,5 +1,6 @@
-This is the base version of test file 2.
-Line 2 will be deleted.
+This is the MODIFIED version of test file 2.
 Line 3 will be kept.
-Line 4 will also be deleted.
+NEW LINE ADDED HERE - should appear in diff
 Line 5 stays.
+ANOTHER NEW LINE - should also appear in diff
+Final line to test additions
