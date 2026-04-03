@@ -1,0 +1,5 @@
+This is the base version of test file 2.
+Line 2 will be deleted.
+Line 3 will be kept.
+Line 4 will also be deleted.
+Line 5 stays.
