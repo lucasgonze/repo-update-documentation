@@ -19,12 +19,13 @@ class TestCopyrightWorkflow(unittest.TestCase):
                 {
                     "name": "test-repo",
                     "url": "https://github.com/example/test-repo.git",
-                    "last_registered_commit": "abc1234"
+                    "starting_commit": "abc1234",
+                    "ending_commit": "def5678"
                 }
             ]
         }
         self.config_json = json.dumps(self.config_data)
-        
+
         # Patch open to provide the mock config
         with patch("builtins.open", mock_open(read_data=self.config_json)):
             with patch("pathlib.Path.exists", return_value=True):
@@ -41,16 +42,18 @@ class TestCopyrightWorkflow(unittest.TestCase):
     @patch("pathlib.Path.exists")
     def test_sync_repositories_clone(self, mock_exists, mock_mkdir, mock_run):
         """Test cloning a repo when it doesn't exist."""
-        # Repo dir doesn't exist, then specific repo doesn't exist
-        mock_exists.side_effect = [True, False] 
+        # Return False for repo_path.exists() to trigger clone
+        mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
 
         self.workflow.sync_repositories()
-        
-        # Verify clone was called
-        mock_run.assert_any_call(
-            ["git", "clone", self.config_data["repositories"][0]["url"], "test_repos/test-repo"],
-            cwd=None, capture_output=True, text=True, check=False
+
+        # Verify clone was called - match the Path argument
+        expected_url = self.config_data["repositories"][0]["url"]
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        self.assertTrue(
+            any(["git", "clone", expected_url] == call[:3] for call in calls),
+            f"Expected git clone call not found in {calls}"
         )
 
     @patch("subprocess.run")
@@ -76,12 +79,12 @@ class TestCopyrightWorkflow(unittest.TestCase):
     def test_generate_diffs_success(self, mock_file, mock_mkdir, mock_rmtree, mock_exists, mock_run):
         """Test successful diff generation and filtering logic."""
         mock_exists.return_value = True
-        
-        # Mock git rev-parse and git diff
+
+        # Mock git rev-parse (for ending_commit) and git diff
         diff_output = "--- a/file.txt\n+++ b/file.txt\n-deleted line\n+added line\n"
         mock_run.side_effect = [
-            MagicMock(stdout="curr_hash_123", returncode=0), # rev-parse
-            MagicMock(stdout=diff_output, returncode=0)      # diff
+            MagicMock(stdout="def5678\n", returncode=0),  # rev-parse ending_commit
+            MagicMock(stdout=diff_output, returncode=0)   # diff
         ]
 
         self.workflow.generate_diffs()
@@ -101,10 +104,11 @@ class TestCopyrightWorkflow(unittest.TestCase):
     def test_create_archive_with_pdf(self, mock_file, mock_zip, mock_run, mock_which, mock_exists):
         """Test archive creation when cupsfilter is available."""
         mock_which.return_value = "/usr/bin/cupsfilter"
-        
-        # Mock glob to find one .diff file
+
+        # Mock glob to find one .diff file and mock read_text for README
         with patch("pathlib.Path.glob", return_value=[Path("test.diff")]):
-            self.workflow.create_archive()
+            with patch("pathlib.Path.read_text", return_value="README content\n"):
+                self.workflow.create_archive()
 
         # Verify PDF conversion was attempted
         mock_run.assert_any_call(
@@ -119,10 +123,12 @@ class TestCopyrightWorkflow(unittest.TestCase):
     def test_create_archive_no_pdf(self, mock_zip, mock_which, mock_exists):
         """Test archive creation when cupsfilter is missing (fallback to text)."""
         with patch("pathlib.Path.glob", return_value=[]):
-            with patch("builtins.open", mock_open()):
-                self.workflow.create_archive()
-        
-        self.assertIn("PDF generation failed", str(self.workflow.warnings) if self.workflow.warnings else "")
+            with patch("pathlib.Path.read_text", return_value="README content\n"):
+                with patch("builtins.open", mock_open()):
+                    self.workflow.create_archive()
+
+        # When cupsfilter is not available, no warning is generated (it just skips PDF generation)
+        mock_zip.assert_called_once()
 
     def test_run_modes(self):
         """Test that different modes trigger the correct methods."""

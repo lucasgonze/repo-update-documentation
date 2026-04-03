@@ -41,10 +41,18 @@ class CopyrightWorkflow:
         """Clones or updates repositories listed in config."""
         self.log_info("=== Syncing Repositories ===")
         self.repos_dir.mkdir(exist_ok=True)
-        
+
+        # Track which repos we've already synced to avoid duplicates
+        synced_repos = set()
+
         for repo in self.config.get("repositories", []):
             name, url = repo["name"], repo["url"]
             repo_path = self.repos_dir / name
+
+            # Skip if we've already synced this repo
+            if name in synced_repos:
+                continue
+            synced_repos.add(name)
 
             if not repo_path.exists():
                 self.log_info(f"Cloning {name}...")
@@ -67,23 +75,43 @@ class CopyrightWorkflow:
 
         readme_content = [f"Diffs recorded {datetime.now()}\n"]
 
-        for repo in self.config.get("repositories", []):
+        # Track counts for duplicate repo names to create unique filenames
+        repo_counts = {}
+
+        for idx, repo in enumerate(self.config.get("repositories", [])):
             name = repo["name"]
-            prev_hash = repo["last_registered_commit"]
+            starting_commit = repo["starting_commit"]
+            ending_commit = repo.get("ending_commit", "HEAD")
             repo_path = self.repos_dir / name
-            diff_file = self.output_dir / f"{name.replace('/', '_')}.diff"
 
             if not repo_path.exists():
                 self.log_error(f"Repository {name} path does not exist.")
                 continue
 
+            # Generate unique filename for this entry
+            repo_counts[name] = repo_counts.get(name, 0) + 1
+            if repo_counts[name] > 1:
+                diff_file = self.output_dir / f"{name.replace('/', '_')}_{repo_counts[name]}.diff"
+            else:
+                diff_file = self.output_dir / f"{name.replace('/', '_')}.diff"
+
+            # Resolve ending_commit to actual hash
+            ending_hash_res = self.run_git(["rev-parse", ending_commit], cwd=repo_path)
+            if ending_hash_res.returncode != 0:
+                self.log_error(f"Failed to resolve {ending_commit} for {name}: {ending_hash_res.stderr}")
+                continue
+            ending_hash = ending_hash_res.stdout.strip()
+
             # Metadata for README
-            curr_hash = self.run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip()
-            readme_content.append(f"# Repository: {name}\nCurrent={curr_hash}\nPrevious={prev_hash}\n")
+            readme_content.append(f"# Repository: {name}\nStarting={starting_commit}\nEnding={ending_hash}\n")
 
             # 1. Create the full diff
-            res = self.run_git(["diff", prev_hash, "HEAD"], cwd=repo_path)
-            
+            res = self.run_git(["diff", starting_commit, ending_hash], cwd=repo_path)
+
+            if res.returncode != 0:
+                self.log_error(f"Failed to generate diff for {name}: {res.stderr}")
+                continue
+
             # 2. BUSINESS LOGIC: Filter out deletions
             # We skip lines starting with '-' unless it's the '---' file header.
             filtered_lines = []
@@ -95,9 +123,9 @@ class CopyrightWorkflow:
             if filtered_lines:
                 with open(diff_file, 'w') as f:
                     f.write("\n".join(filtered_lines))
-                self.log_success(f"Generated diff for {name}")
+                self.log_success(f"Generated diff for {name} ({starting_commit}..{ending_commit})")
             else:
-                self.log_warning(f"No new authorship found for {name}")
+                self.log_warning(f"No new authorship found for {name} ({starting_commit}..{ending_commit})")
 
         with open(self.output_dir / "README.txt", "w") as f:
             f.write("\n".join(readme_content))
