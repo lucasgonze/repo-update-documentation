@@ -103,19 +103,37 @@ class TestCopyrightWorkflow(unittest.TestCase):
     @patch("shutil.make_archive")
     @patch("builtins.open", new_callable=mock_open)
     def test_create_archive_with_pdf(self, mock_file, mock_zip, mock_run, mock_which, mock_exists):
-        """Test archive creation when cupsfilter is available."""
+        """Test archive creation when cupsfilter is available and PDF is not truncated."""
         mock_which.return_value = "/usr/bin/cupsfilter"
+
+        # Mock cupsfilter to return reasonably-sized PDF content
+        mock_run.return_value = MagicMock(
+            stdout=b"large pdf content" * 10000,  # Large PDF (170KB)
+            stderr=b"",
+            returncode=0
+        )
+
+        # Mock file sizes: text file (100000 bytes), PDF (170000 bytes = 170% - well above 10% threshold)
+        mock_stat_pdf = MagicMock()
+        mock_stat_pdf.st_size = 170000  # PDF size
+        mock_stat_txt = MagicMock()
+        mock_stat_txt.st_size = 100000  # Text size
 
         # Mock glob to find one .diff file and mock read_text for README
         with patch("pathlib.Path.glob", return_value=[Path("test.diff")]):
             with patch("pathlib.Path.read_text", return_value="README content\n"):
-                self.workflow.create_archive()
+                with patch("pathlib.Path.stat", side_effect=[mock_stat_pdf, mock_stat_txt]):
+                    self.workflow.create_archive()
 
         # Verify PDF conversion was attempted - check for runlog.txt in the path
         calls = [call for call in mock_run.call_args_list
                  if call.args[0][0] == "cupsfilter" and "runlog.txt" in str(call.args[0][1])]
         self.assertTrue(len(calls) > 0, "Expected cupsfilter call with runlog.txt not found")
         mock_zip.assert_called_once()
+
+        # Verify no truncation warning (PDF is large enough)
+        truncation_warnings = [w for w in self.workflow.warnings if "incomplete" in w]
+        self.assertEqual(len(truncation_warnings), 0)
 
     @patch("pathlib.Path.exists", return_value=True)
     @patch("shutil.which", return_value=None)
@@ -167,7 +185,8 @@ class TestCopyrightWorkflow(unittest.TestCase):
     @patch("pathlib.Path.exists")
     @patch("shutil.rmtree")
     @patch("pathlib.Path.mkdir")
-    def test_generate_diffs_repo_not_found(self, mock_mkdir, mock_rmtree, mock_exists, mock_run):
+    @patch("builtins.open", new_callable=mock_open)
+    def test_generate_diffs_repo_not_found(self, mock_file, mock_mkdir, mock_rmtree, mock_exists, mock_run):
         """Test handling when repository path doesn't exist."""
         mock_exists.return_value = False
 
@@ -181,7 +200,8 @@ class TestCopyrightWorkflow(unittest.TestCase):
     @patch("pathlib.Path.exists")
     @patch("shutil.rmtree")
     @patch("pathlib.Path.mkdir")
-    def test_generate_diffs_rev_parse_failure(self, mock_mkdir, mock_rmtree, mock_exists, mock_run):
+    @patch("builtins.open", new_callable=mock_open)
+    def test_generate_diffs_rev_parse_failure(self, mock_file, mock_mkdir, mock_rmtree, mock_exists, mock_run):
         """Test handling of git rev-parse failure."""
         mock_exists.return_value = True
         mock_run.return_value = MagicMock(returncode=1, stderr="Invalid commit")
@@ -228,6 +248,37 @@ class TestCopyrightWorkflow(unittest.TestCase):
         # Verify warning was logged
         self.assertTrue(len(self.workflow.warnings) > 0)
         self.assertIn("PDF generation failed", self.workflow.warnings[0])
+
+    @patch("pathlib.Path.exists", return_value=True)
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    @patch("shutil.make_archive")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_create_archive_pdf_truncation_warning(self, mock_file, mock_zip, mock_run, mock_which, mock_exists):
+        """Test detection of truncated PDF (when PDF is suspiciously small)."""
+        mock_which.return_value = "/usr/bin/cupsfilter"
+
+        # Mock cupsfilter to return small PDF content with stderr warning
+        mock_run.return_value = MagicMock(
+            stdout=b"small pdf content",  # 17 bytes
+            stderr=b"cupsfilter: File too large, output may be truncated",
+            returncode=0
+        )
+
+        # Mock file sizes: large text file (1000000 bytes), small PDF (5000 bytes = 0.5%)
+        mock_stat = MagicMock()
+        mock_stat.st_size = 5000  # PDF size (first call to stat())
+        mock_stat_txt = MagicMock()
+        mock_stat_txt.st_size = 1000000  # Text size (second call to stat())
+
+        with patch("pathlib.Path.glob", return_value=[]):
+            with patch("pathlib.Path.read_text", return_value="README content\n"):
+                with patch("pathlib.Path.stat", side_effect=[mock_stat, mock_stat_txt]):
+                    self.workflow.create_archive()
+
+        # Verify truncation warning was logged (PDF is < 10% of text size)
+        self.assertTrue(len(self.workflow.warnings) > 0)
+        self.assertIn("PDF may be incomplete", self.workflow.warnings[0])
 
     def test_log_warning(self):
         """Test log_warning method."""

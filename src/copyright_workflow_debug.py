@@ -221,11 +221,36 @@ class CopyrightWorkflow:
         if shutil.which("cupsfilter"):
             try:
                 debug_log("Generating PDF with cupsfilter...")
+                debug_log(f"Input file size: {combined_path.stat().st_size} bytes")
+
+                # Run cupsfilter and capture stderr for debugging
+                result = subprocess.run(
+                    ["cupsfilter", str(combined_path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True
+                )
+
+                # Write the PDF output
                 with open(pdf_path, "wb") as pdf_file:
-                    subprocess.run(["cupsfilter", str(combined_path)], stdout=pdf_file, check=True, stderr=subprocess.DEVNULL)
+                    pdf_file.write(result.stdout)
+
                 pdf_size = pdf_path.stat().st_size
                 debug_log(f"PDF generated: {pdf_size} bytes")
-                self.log_success("Generated runlog.pdf")
+
+                # Check if PDF seems too small
+                txt_size = combined_path.stat().st_size
+                if pdf_size < txt_size * 0.1:  # PDF should be at least 10% of text size
+                    debug_log(f"WARNING: PDF size ({pdf_size}) seems too small compared to text ({txt_size})")
+                    debug_log(f"cupsfilter stderr: {result.stderr.decode('utf-8', errors='replace')}")
+                    self.log_warning(f"PDF may be incomplete (only {pdf_size} bytes from {txt_size} bytes text)")
+                else:
+                    self.log_success("Generated runlog.pdf")
+
+                # If stderr had content, show it
+                if result.stderr:
+                    debug_log(f"cupsfilter stderr: {result.stderr.decode('utf-8', errors='replace')}")
+
             except Exception as e:
                 debug_log(f"PDF generation exception: {e}")
                 self.log_warning(f"PDF generation failed: {e}")

@@ -287,9 +287,15 @@ The test suite achieves 100% code coverage:
 - Indicates the commit range only contained deletions
 - The diff file will contain only file headers
 
-**PDF generation fails**
-- Install `cupsfilter`: `brew install cups` (macOS) or `apt-get install cups` (Linux)
-- The tool will still generate .txt and .zip files without it
+**PDF generation fails or is incomplete**
+- **Known Issue**: cupsfilter may truncate large files (>500KB), showing only the last diff
+- **Workaround**: Use `runlog.txt` instead of the PDF - it contains all diffs correctly
+- **Alternative**: Convert the .txt to PDF using other tools:
+  - `enscript -p - runlog.txt | ps2pdf - runlog.pdf` (if available)
+  - Use a text editor to print to PDF
+  - Upload `runlog.txt` directly for copyright submissions
+- The tool will still generate complete .txt and .zip files regardless
+- Install cupsfilter: `brew install cups` (macOS) or `apt-get install cups` (Linux)
 
 ### Debug Mode
 

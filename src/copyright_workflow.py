@@ -152,9 +152,27 @@ class CopyrightWorkflow:
         pdf_path = self.build_dir / "runlog.pdf"
         if shutil.which("cupsfilter"):
             try:
+                # Run cupsfilter and capture output
+                result = subprocess.run(
+                    ["cupsfilter", str(combined_path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True
+                )
+
+                # Write the PDF output
                 with open(pdf_path, "wb") as pdf_file:
-                    subprocess.run(["cupsfilter", str(combined_path)], stdout=pdf_file, check=True, stderr=subprocess.DEVNULL)
-                self.log_success("Generated runlog.pdf")
+                    pdf_file.write(result.stdout)
+
+                # Warn if PDF seems truncated
+                pdf_size = pdf_path.stat().st_size
+                txt_size = combined_path.stat().st_size
+                if pdf_size < txt_size * 0.1:
+                    self.log_warning(f"PDF may be incomplete ({pdf_size} bytes from {txt_size} bytes text). Check cupsfilter compatibility.")
+                    if result.stderr:
+                        print(f"cupsfilter stderr: {result.stderr.decode('utf-8', errors='replace')}")
+                else:
+                    self.log_success("Generated runlog.pdf")
             except Exception as e:
                 self.log_warning(f"PDF generation failed: {e}")
 
