@@ -21,10 +21,16 @@ class CopyrightWorkflow:
         # Use build/ directory under project root for all temporary files
         self.build_dir = Path("build")
         self.repos_dir = self.build_dir / "repos"
-        self.output_dir = self.build_dir / "diffs"
+
+        # Create dated output directory structure
+        date_str = datetime.now().strftime("%B-%d-%Y")  # e.g., "April-03-2026"
+        self.output_package_dir = self.build_dir / f"Copyright-Registration-Updates-{date_str}"
+        self.output_dir = self.output_package_dir / "Diffs"
+
         self.errors = []
         self.warnings = []
         print(f"Using build directory: {self.build_dir.absolute()}")
+        print(f"Output package: {self.output_package_dir.name}")
 
     def _load_config(self):
         """Loads repository configuration from JSON."""
@@ -152,7 +158,13 @@ class CopyrightWorkflow:
     def create_archive(self):
         """Combines diffs into a PDF and Zips the output folder."""
         self.log_info("\n=== Creating Archive ===")
-        combined_path = self.build_dir / "runlog.txt"
+
+        # Generate date-based filename
+        date_str = datetime.now().strftime("%m-%d-%Y")  # e.g., "04-03-2026"
+        combined_filename = f"All-Updates-{date_str}.txt"
+        pdf_filename = f"All-Updates-{date_str}.pdf"
+
+        combined_path = self.output_package_dir / combined_filename
 
         debug_log(f"Output directory: {self.output_dir}")
         debug_log(f"Combined path: {combined_path}")
@@ -217,7 +229,7 @@ class CopyrightWorkflow:
         debug_log(f"Found {file_markers} FILE: markers in combined output")
 
         # Attempt PDF generation via cupsfilter
-        pdf_path = self.build_dir / "runlog.pdf"
+        pdf_path = self.output_package_dir / pdf_filename
         if shutil.which("cupsfilter"):
             try:
                 debug_log("Generating PDF with cupsfilter...")
@@ -245,7 +257,7 @@ class CopyrightWorkflow:
                     debug_log(f"cupsfilter stderr: {result.stderr.decode('utf-8', errors='replace')}")
                     self.log_warning(f"PDF may be incomplete (only {pdf_size} bytes from {txt_size} bytes text)")
                 else:
-                    self.log_success("Generated runlog.pdf")
+                    self.log_success(f"Generated {pdf_filename}")
 
                 # If stderr had content, show it
                 if result.stderr:
@@ -257,14 +269,14 @@ class CopyrightWorkflow:
         else:
             debug_log("cupsfilter not found, skipping PDF generation")
 
-        # Create Zip
-        zip_path = str(self.build_dir / "runlog")
-        debug_log(f"Creating zip archive: {zip_path}.zip")
-        debug_log(f"Archiving directory: {self.output_dir}")
-        shutil.make_archive(zip_path, "zip", self.output_dir)
-        zip_size = Path(f"{zip_path}.zip").stat().st_size
+        # Create Zip of the entire package directory
+        zip_base_path = str(self.build_dir / self.output_package_dir.name)
+        debug_log(f"Creating zip archive: {zip_base_path}.zip")
+        debug_log(f"Archiving directory: {self.output_package_dir}")
+        shutil.make_archive(zip_base_path, "zip", root_dir=self.build_dir, base_dir=self.output_package_dir.name)
+        zip_size = Path(f"{zip_base_path}.zip").stat().st_size
         debug_log(f"Zip created: {zip_size} bytes")
-        self.log_success("Generated runlog.zip")
+        self.log_success(f"Generated {self.output_package_dir.name}.zip")
 
     def run(self, mode="full"):
         if mode in ["check", "full"]:

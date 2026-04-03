@@ -39,16 +39,21 @@ The tool intelligently processes git diffs:
 
 ### Build Management
 
-All temporary files are organized in a single `build/` directory:
+All files are organized in a single `build/` directory with date-stamped output packages:
 ```
 build/
-├── repos/          # Cloned repositories
-├── diffs/          # Generated .diff files
-│   └── README.txt  # Metadata about diffs
-├── runlog.txt      # Combined diff content
-├── runlog.pdf      # PDF version (requires cupsfilter)
-└── runlog.zip      # Archive of all diffs
+├── repos/                                           # Cloned repositories
+├── Copyright-Registration-Updates-April-03-2026/   # Date-stamped output package
+│   ├── All-Updates-04-03-2026.txt                 # Combined diff content
+│   ├── All-Updates-04-03-2026.pdf                 # PDF version (requires cupsfilter)
+│   └── Diffs/                                      # Individual diff files
+│       ├── repo-name.diff
+│       ├── repo-name_2.diff
+│       └── README.txt                              # Metadata about diffs
+└── Copyright-Registration-Updates-April-03-2026.zip # Zip archive of the package
 ```
+
+The output package directory name uses the format `Copyright-Registration-Updates-{Month}-{Day}-{Year}`, making it easy to track when submissions were prepared.
 
 ## Installation
 
@@ -193,6 +198,7 @@ The workflow provides color-coded console output:
 **Example:**
 ```
 Using build directory: /path/to/build
+Output package: Copyright-Registration-Updates-April-03-2026
 === Syncing Repositories ===
 Cloning my-project...
 
@@ -201,8 +207,8 @@ SUCCESS: Generated diff for my-project (abc1234..def5678)
 WARNING: No new authorship found for other-project (xyz9999..HEAD)
 
 === Creating Archive ===
-SUCCESS: Generated runlog.pdf
-SUCCESS: Generated runlog.zip
+SUCCESS: Generated All-Updates-04-03-2026.pdf
+SUCCESS: Generated Copyright-Registration-Updates-April-03-2026.zip
 
 === Summary ===
 SUCCESS: Workflow completed successfully!
@@ -210,13 +216,20 @@ SUCCESS: Workflow completed successfully!
 
 ### Generated Files
 
-After running, check the `build/` directory:
+After running, check the `build/` directory for a date-stamped package:
 
-1. **Individual diff files**: `build/diffs/*.diff` - One per repository entry
-2. **README**: `build/diffs/README.txt` - Metadata about all diffs
-3. **Combined diff**: `build/runlog.txt` - All diffs in one text file
-4. **PDF**: `build/runlog.pdf` - PDF version of combined diff
-5. **Archive**: `build/runlog.zip` - Zip file of all diffs
+1. **Package Directory**: `build/Copyright-Registration-Updates-{Date}/`
+   - Contains all files ready for submission
+2. **Combined Text File**: `All-Updates-{MM-DD-YYYY}.txt`
+   - All diffs in one text file with headers and metadata
+3. **PDF Version**: `All-Updates-{MM-DD-YYYY}.pdf`
+   - PDF version of combined diff (requires cupsfilter)
+4. **Diffs Subdirectory**: `Diffs/`
+   - Individual `.diff` files (one per repository entry)
+   - `README.txt` with metadata about all diffs
+5. **Zip Archive**: `build/Copyright-Registration-Updates-{Date}.zip`
+   - Complete package ready to share or archive
+   - Extracts to a directory with the same dated name
 
 ### Diff File Naming
 

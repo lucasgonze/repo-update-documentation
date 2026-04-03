@@ -125,10 +125,10 @@ class TestCopyrightWorkflow(unittest.TestCase):
                 with patch("pathlib.Path.stat", side_effect=[mock_stat_pdf, mock_stat_txt]):
                     self.workflow.create_archive()
 
-        # Verify PDF conversion was attempted - check for runlog.txt in the path
+        # Verify PDF conversion was attempted - check for All-Updates in the path
         calls = [call for call in mock_run.call_args_list
-                 if call.args[0][0] == "cupsfilter" and "runlog.txt" in str(call.args[0][1])]
-        self.assertTrue(len(calls) > 0, "Expected cupsfilter call with runlog.txt not found")
+                 if call.args[0][0] == "cupsfilter" and "All-Updates" in str(call.args[0][1])]
+        self.assertTrue(len(calls) > 0, "Expected cupsfilter call with All-Updates file not found")
         mock_zip.assert_called_once()
 
         # Verify no truncation warning (PDF is large enough)

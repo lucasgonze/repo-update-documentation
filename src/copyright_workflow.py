@@ -13,10 +13,16 @@ class CopyrightWorkflow:
         # Use build/ directory under project root for all temporary files
         self.build_dir = Path("build")
         self.repos_dir = self.build_dir / "repos"
-        self.output_dir = self.build_dir / "diffs"
+
+        # Create dated output directory structure
+        date_str = datetime.now().strftime("%B-%d-%Y")  # e.g., "April-03-2026"
+        self.output_package_dir = self.build_dir / f"Copyright-Registration-Updates-{date_str}"
+        self.output_dir = self.output_package_dir / "Diffs"
+
         self.errors = []
         self.warnings = []
         print(f"Using build directory: {self.build_dir.absolute()}")
+        print(f"Output package: {self.output_package_dir.name}")
 
     def _load_config(self):
         """Loads repository configuration from JSON."""
@@ -136,7 +142,13 @@ class CopyrightWorkflow:
     def create_archive(self):
         """Combines diffs into a PDF and Zips the output folder."""
         self.log_info("\n=== Creating Archive ===")
-        combined_path = self.build_dir / "runlog.txt"
+
+        # Generate date-based filename
+        date_str = datetime.now().strftime("%m-%d-%Y")  # e.g., "04-03-2026"
+        combined_filename = f"All-Updates-{date_str}.txt"
+        pdf_filename = f"All-Updates-{date_str}.pdf"
+
+        combined_path = self.output_package_dir / combined_filename
 
         # Combine everything for the PDF
         with open(combined_path, 'w') as outfile:
@@ -149,7 +161,7 @@ class CopyrightWorkflow:
                 outfile.write(f.read_text())
 
         # Attempt PDF generation via cupsfilter
-        pdf_path = self.build_dir / "runlog.pdf"
+        pdf_path = self.output_package_dir / pdf_filename
         if shutil.which("cupsfilter"):
             try:
                 # Run cupsfilter and capture output
@@ -172,14 +184,14 @@ class CopyrightWorkflow:
                     if result.stderr:
                         print(f"cupsfilter stderr: {result.stderr.decode('utf-8', errors='replace')}")
                 else:
-                    self.log_success("Generated runlog.pdf")
+                    self.log_success(f"Generated {pdf_filename}")
             except Exception as e:
                 self.log_warning(f"PDF generation failed: {e}")
 
-        # Create Zip
-        zip_path = str(self.build_dir / "runlog")
-        shutil.make_archive(zip_path, "zip", self.output_dir)
-        self.log_success("Generated runlog.zip")
+        # Create Zip of the entire package directory
+        zip_base_path = str(self.build_dir / self.output_package_dir.name)
+        shutil.make_archive(zip_base_path, "zip", root_dir=self.build_dir, base_dir=self.output_package_dir.name)
+        self.log_success(f"Generated {self.output_package_dir.name}.zip")
 
     def run(self, mode="full"):
         if mode in ["check", "full"]:
