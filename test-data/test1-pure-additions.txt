@@ -1,0 +1,10 @@
+This is a test file for pure additions.
+Every line in this file is new.
+This tests that additions are properly included in the diff.
+
+Function to test:
+def hello_world():
+    print("Hello, World!")
+    return True
+
+This file should appear in the diff with all + prefixes.
