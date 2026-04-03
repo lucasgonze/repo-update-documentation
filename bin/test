@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Script to run the unit tests
+
+cd "$(dirname "$0")/.."
+source myenv/bin/activate
+cd src
+python3 -m unittest test_copyright_workflow.py "$@"

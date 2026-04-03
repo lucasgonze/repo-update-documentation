@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Script to run test coverage
+
+cd "$(dirname "$0")/.."
+source myenv/bin/activate
+cd src
+
+# Run coverage
+coverage run -m unittest test_copyright_workflow.py
+
+# Show report
+echo ""
+echo "=== Coverage Report ==="
+coverage report -m
+
+# Generate HTML report
+coverage html
+echo ""
+echo "HTML report generated at: src/htmlcov/index.html"

@@ -10,10 +10,13 @@ class CopyrightWorkflow:
     def __init__(self, config_path="repos-config.json"):
         self.config_path = Path(config_path)
         self.config = self._load_config()
-        self.repos_dir = Path(self.config.get("repos_dir", "repos"))
-        self.output_dir = Path(self.config.get("output_dir", "diffs"))
+        # Use build/ directory under project root for all temporary files
+        self.build_dir = Path("build")
+        self.repos_dir = self.build_dir / "repos"
+        self.output_dir = self.build_dir / "diffs"
         self.errors = []
         self.warnings = []
+        print(f"Using build directory: {self.build_dir.absolute()}")
 
     def _load_config(self):
         """Loads repository configuration from JSON."""
@@ -40,7 +43,7 @@ class CopyrightWorkflow:
     def sync_repositories(self):
         """Clones or updates repositories listed in config."""
         self.log_info("=== Syncing Repositories ===")
-        self.repos_dir.mkdir(exist_ok=True)
+        self.repos_dir.mkdir(parents=True, exist_ok=True)
 
         # Track which repos we've already synced to avoid duplicates
         synced_repos = set()
@@ -133,29 +136,31 @@ class CopyrightWorkflow:
     def create_archive(self):
         """Combines diffs into a PDF and Zips the output folder."""
         self.log_info("\n=== Creating Archive ===")
-        combined_path = Path("runlog.txt")
-        
+        combined_path = self.build_dir / "runlog.txt"
+
         # Combine everything for the PDF
         with open(combined_path, 'w') as outfile:
             readme = self.output_dir / "README.txt"
             if readme.exists():
                 outfile.write(readme.read_text() + "\n")
-            
+
             for f in self.output_dir.glob("*.diff"):
                 outfile.write(f"\n{'='*80}\nFILE: {f.name}\n{'='*80}\n")
                 outfile.write(f.read_text())
 
         # Attempt PDF generation via cupsfilter
+        pdf_path = self.build_dir / "runlog.pdf"
         if shutil.which("cupsfilter"):
             try:
-                with open("runlog.pdf", "wb") as pdf_file:
+                with open(pdf_path, "wb") as pdf_file:
                     subprocess.run(["cupsfilter", str(combined_path)], stdout=pdf_file, check=True, stderr=subprocess.DEVNULL)
                 self.log_success("Generated runlog.pdf")
             except Exception as e:
                 self.log_warning(f"PDF generation failed: {e}")
 
         # Create Zip
-        shutil.make_archive("runlog", "zip", self.output_dir)
+        zip_path = str(self.build_dir / "runlog")
+        shutil.make_archive(zip_path, "zip", self.output_dir)
         self.log_success("Generated runlog.zip")
 
     def run(self, mode="full"):
