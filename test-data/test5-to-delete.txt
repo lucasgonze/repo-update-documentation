@@ -1,6 +1,0 @@
-This content will all be deleted.
-Line 2 to delete.
-Line 3 to delete.
-Line 4 to delete.
-Line 5 to delete.
-All these lines should be filtered out in the diff.
